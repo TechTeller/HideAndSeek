@@ -1,32 +1,31 @@
 "DOTAAbilities"
 {
 	//Shield
-	"item_example_item"
+	"item_slingshot"
 	{
 		"ID"							"1836"
 		"AbilityBehavior"				"DOTA_ABILITY_BEHAVIOR_POINT | DOTA_ABILITY_BEHAVIOR_DONT_RESUME_ATTACK"
 		"AbilityUnitTargetTeam"			"DOTA_UNIT_TARGET_TEAM_ENEMY"
-		"AbilityUnitTargetType"			"DOTA_UNIT_TARGET_HERO"
 		"BaseClass"						"item_datadriven"
-    "AbilityCastAnimation"			"ACT_DOTA_DISABLED"
-		"AbilityTextureName"			"item_example_item"
+    	"AbilityCastAnimation"			"ACT_DOTA_DISABLED"
+		"AbilityTextureName"			"Slingshot"
 
 		// Stats
 		//-------------------------------------------------------------------------------------------------------------
-		"AbilityCastRange"				"900"
+		"AbilityCastRange"				"500"
 		"AbilityCastPoint"				"0.2"
-		"AbilityCooldown"				"13.0"
+		"AbilityCooldown"				"0.6"
 
 		// Item Info
 		//-------------------------------------------------------------------------------------------------------------
-		"AbilityManaCost"				"100"
-		"ItemCost"						"750"
+		"AbilityManaCost"				"0"
+		"ItemCost"						"0"
 		"ItemInitialCharges"			"0"
 		"ItemDroppable"					"1"
 		"ItemSellable"					"1"
 		"ItemRequiresCharges"			"0"
 		"ItemShareability"				"ITEM_NOT_SHAREABLE"
-		"ItemDeclarations"				"DECLARE_PURCHASES_TO_TEAMMATES | DECLARE_PURCHASES_TO_SPECTATORS"
+		"ItemDeclarations"				""
 		
 		"MaxUpgradeLevel"				"1"
 		"ItemBaseLevel"					"1"
@@ -34,64 +33,73 @@
 		"precache"
 		{
 			"particlefile"				"particles/frostivus_herofx.pcf"
-      "soundfile"				"scripts/game_sounds_heroes/game_sounds_abaddon.txt"
+      		"soundfile"					"scripts/game_sounds_heroes/game_sounds_furion.txt"
 		}
 		"OnSpellStart"
-    {
-      "LinearProjectile"
-      {
-        "EffectName"			"queen_shadow_strike_linear_parent"
+    	{
+      		"LinearProjectile"
+			{
+				"Target"				"POINT"
+				"EffectName"			"frostivus_skeletonking_hellfireblast"
 				"MoveSpeed"				"%speed"
-				//"StartPosition"	  "attach_attack1"
-        "FixedDistance"   "%distance"
 				"StartRadius"			"%radius"
 				"EndRadius"				"%radius"
 				"TargetTeams"			"DOTA_UNIT_TARGET_TEAM_ENEMY"
-				"TargetTypes"			"DOTA_UNIT_TARGET_HERO"
+				"TargetTypes"			"DOTA_UNIT_TARGET_HERO | DOTA_UNIT_TARGET_CREEP"
 				"TargetFlags"			"DOTA_UNIT_TARGET_FLAG_NONE"
 				"HasFrontalCone"		"0"
-				"ProvidesVision"		"0"
-				"VisionRadius"			"0"
-      }
-      "FireSound"
-			{
-				"EffectName"		"Hero_Abaddon.AphoticShield.Cast"
-				"Target"			  "CASTER"
+				"StartPosition"			"attach_attack1"
+				"FixedDistance"			"1000"
 			}
-      "ApplyModifier"
+      		"FireSound"
 			{
-				"Target"  		"CASTER"
-				"ModifierName"	"modifier_item_shield"
+				"EffectName"		"Hero_Furion.Attack"
+				"Target"			"CASTER"
 			}
-    }
+    	}
     
 		"OnProjectileHitUnit"
 		{			
-      "DeleteOnHit" "0"
+      		"DeleteOnHit" "0"
 			"Damage"
 			{
 				"Target"  		"TARGET"
-        "Type"		"DAMAGE_TYPE_PURE"
-				"Damage"	"%damage"
+        		"Type"			"DAMAGE_TYPE_PURE"
+				"Damage"		"%damage"
 			}
+			"FireSound"
+			{
+				"EffectName"		"Hero_Furion.ProjectileImpact"
+				"Target"			"CASTER"
+			}
+			"AbilitySpecial"
+		{
+			"01"
+			{
+				"var_type"				"FIELD_INTEGER"
+				"speed"					"900"
+			}
+
+			"02"
+			{
+				"var_type"				"FIELD_FLOAT"
+				"damage"				"9999"
+			}
+
+			"03"
+			{
+				"var_type"				"FIELD_FLOAT"
+				"radius"				"100"
+			}
+
+			"04"
+			{
+				"var_type"				"FIELD_FLOAT"
+				"range"					"1000"
+			}
+		}
 		}
 		
-		"Modifiers"
-		{
-			"modifier_item_shield"
-			{
-				"EffectName"		"damage_immunity"
-				"EffectAttachType"	"follow_origin"
-				"Target"			"CASTER"
-				
-				"Duration" "%duration"
-				"TextureName" "abaddon_aphotic_shield"
-				"Properties"
-				{
-					"MODIFIER_PROPERTY_INCOMING_DAMAGE_PERCENTAGE"		"%damage_reduction"
-				}
-			}
-		}
 		
 		// Special	
 		//-------------------------------------------------------------------------------------------------------------

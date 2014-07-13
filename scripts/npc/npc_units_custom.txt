@@ -2,9 +2,12 @@
 "DOTAUnits"
 {
 	"Version"	"1"
-  
+
 	"npc_tree_dummy"
 	{
+		"MinimapIcon"					""
+		"HealthBarOffset"				"400000"
+		"MinimapIconSize"				"1"
 		"RingRadius"					"50"
 		"ParticleFile"					"particles/units/heroes/hero_furion.pcf"
 		"MovementCapabilities"			"DOTA_UNIT_CAP_MOVE_NONE"
@@ -13,9 +16,9 @@
 		"ModelScale"					"1.0"
 		"Model"							"models/props_tree/tree_pine_01.mdl"
 		"AttributeIntelligenceGain"		"0"
-		"BoundsHullName"				"DOTA_HULL_SIZE_TOWER"
+		"BoundsHullName"				"DOTA_HULL_SIZE_SMALL"
 		"TowerType"						"Normal"
-		"TeamName"						"DOTA_TEAM_BADGUYS"
+		"TeamName"						"DOTA_TEAM_NEUTRALS"
 		"AttributeBaseStrength"			"0"
 		"StatusHealthRegen"				"0"
 		"AttackDamageMax"				"20"

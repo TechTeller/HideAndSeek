@@ -28,5 +28,6 @@ local function loadModule(name)
     end
 end
 
+loadModule ( 'physics' )
 loadModule ( 'util' )
 loadModule ( 'hideandseek')
