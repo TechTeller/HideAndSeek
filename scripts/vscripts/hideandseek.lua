@@ -12,7 +12,7 @@ roundOne = true
 
 ROUNDS_TO_WIN = 3
 ROUND_TIME = 10 --240
-PRE_GAME_TIME = 30 -- 30
+PRE_GAME_TIME = 0 -- 30
 PRE_ROUND_TIME = 30 --30
 POST_ROUND_TIME = 5
 POST_GAME_TIME = 30
@@ -115,6 +115,8 @@ function HideAndSeekGameMode:InitGameMode()
 
   self.Hunters = {}
   self.Props = {}
+  self.nRadiantScore = 0
+  self.nDireScore = 0
 
   self.PropsTeam = "Dire"
   self.HunterTeam = "Radiant"
@@ -227,13 +229,13 @@ function HideAndSeekGameMode:AutoAssignPlayer(keys)
     return
   end
 
-   self.vPlayers[playerID] = ply
   -- If we're not on D2MODD.in, assign players round robin to teams
   if not USE_LOBBY and playerID == -1 then
     if #self.vRadiant > #self.vDire then 
       ply:SetTeam(DOTA_TEAM_BADGUYS)
       ply:__KeyValueFromInt('teamnumber', DOTA_TEAM_BADGUYS)
       table.insert (self.vDire, ply)
+      addToSet (self.Props, ply)
       local hero = CreateHeroForPlayer("npc_dota_hero_ancient_apparition", ply)
       hero:SetAbilityPoints(0)
       local ab1 = hero:FindAbilityByName("disguise")
@@ -248,23 +250,65 @@ function HideAndSeekGameMode:AutoAssignPlayer(keys)
       ply:SetTeam(DOTA_TEAM_GOODGUYS)
       ply:__KeyValueFromInt('teamnumber', DOTA_TEAM_GOODGUYS)
       table.insert (self.vRadiant, ply)
+      addToSet (self.Hunters, ply)
       local hero = CreateHeroForPlayer("npc_dota_hero_templar_assassin", ply)
       local slingshot = CreateItem("item_slingshot", hero, hero)
       hero:AddItem(slingshot)    
     end
+    if setContains(self.Props, player) then
+      removeFromSet(self.Props, player)
+      addToSet(self.Hunters, player)
+      print('props contains player')
+      elseif setContains(self.Hunters, player) then
+      removeFromSet(self.Hunters, player)
+      addToSet(self.Props, player)
+      print('hunters contains player')
+    end
     playerID = ply:GetPlayerID()
     self.nConnected = self.nConnected + 1
   end
-  self:InitializeRound()
+
+  self.vSteamIds[PlayerResource:GetSteamAccountID(playerID)] = ply
+
+  --Autoassign player
+  self:CreateTimer('assign_player_'..entIndex, {
+  endTime = Time(),
+  callback = function(hideandseek, args)
+    if GameRules:State_Get() >= DOTA_GAMERULES_STATE_PRE_GAME then
+      print ('[REFLEX] in pregame')
+      -- Assign a hero to a fake client
+      local heroEntity = ply:GetAssignedHero()
+      if PlayerResource:IsFakeClient(playerID) then
+        if heroEntity == nil then
+          CreateHeroForPlayer('npc_dota_hero_axe', ply)
+        else
+          PlayerResource:ReplaceHeroWith(playerID, 'npc_dota_hero_axe', 0, 0)
+        end
+      end
+      heroEntity = ply:GetAssignedHero()
+      -- Check if we have a reference for this player's hero
+      if heroEntity ~= nil and IsValidEntity(heroEntity) then
+        local heroTable = {
+          hero = heroEntity,
+          nKillsThisRound = 0,
+          bDead = false,
+          fLevel = 1.0,
+          nTeam = ply:GetTeam(),
+          bRoundInit = false,
+          bConnected = true,
+          name = self.vUserNames[keys.userid],
+          bColorblind = false,
+        }
+        self.vPlayers[playerID] = heroTable
+      end
+    end
+  end})
 end
 
 function HideAndSeekGameMode:LoopOverPlayers(callback)
   for k, v in pairs(self.vPlayers) do
     -- Validate the player
-    print ('looping')
     if IsValidEntity(v.hero) then
-      print('is valid')
-      print(v.hero)
       -- Run the callback
       if callback(v, v.hero:GetPlayerID()) then
         break
@@ -437,7 +481,18 @@ function Taunt( keys )
   print (tostring(tauntNumber))
 end
 
-local roundOne = true
+  function addToSet(set, key)
+    set[key] = true
+  end
+
+  function removeFromSet(set, key)
+      set[key] = nil
+  end
+
+  function setContains(set, key)
+      return set[key] ~= nil
+  end
+roundOne = true
 function HideAndSeekGameMode:InitializeRound()
   print ( '[REFLEX] InitializeRound called' )
   bInPreRound = true
@@ -456,7 +511,29 @@ function HideAndSeekGameMode:InitializeRound()
       if player.bRoundInit == false then
         print ( '[REFLEX] Initializing player ' .. plyID)
         player.bRoundInit = true
-        player.hero:RespawnHero(false, false, false)
+        if not self.nCurrentRound ~= 1 then
+          if player.hero:GetUnitName() == "npc_dota_hero_templar_assassin" then
+            print('hunters contains player')
+            player.hero = PlayerResource:ReplaceHeroWith(player.hero:GetPlayerID(), "npc_dota_hero_ancient_apparition", 0, 0)
+            player.hero:SetAbilityPoints(0)
+            local ab1 = player.hero:FindAbilityByName("disguise")
+            ab1:SetLevel(4)
+            local ab2 = player.hero:FindAbilityByName("solidify")
+            ab2:SetLevel(4)
+            local ab3 = player.hero:FindAbilityByName("dash")
+            ab3:SetLevel(4)
+            local ab4 = player.hero:FindAbilityByName("taunt")
+            ab4:SetLevel(3)
+          elseif player.hero:GetUnitName() == "npc_dota_hero_ancient_apparition" then
+            local prop = Entities:FindByClassnameNearest("prop_dynamic", player.hero:GetOrigin(), 1.0)
+            prop:Remove()
+            print ('props contains player')
+            player.hero = PlayerResource:ReplaceHeroWith(player.hero:GetPlayerID(), "npc_dota_hero_templar_assassin", 0, 0)
+            player.hero:SetAbilityPoints(0)
+            local slingshot = CreateItem("item_slingshot", hero, hero)
+            hero:AddItem(slingshot)
+          end
+        end
 
         if not player.hero:HasModifier("modifier_stunned") then
           player.hero:AddNewModifier( player.hero, nil , "modifier_stunned", {})
@@ -490,7 +567,7 @@ function HideAndSeekGameMode:InitializeRound()
     })
     roundOne = false
   end
-  
+
   local startCount = 7
   --Set Timers for round start announcements
   self:CreateTimer('round_start_timer', {
@@ -584,18 +661,18 @@ function HideAndSeekGameMode:RoundComplete(timedOut)
   local victor = DOTA_TEAM_GOODGUYS
   local s = "Radiant"
   if timedOut then
-    --If hunters dont kill anyone, boost props score
+    --If hunters dont kill all props, boost props score
     if self.nLastKilled == nil then 
-      if self.PropsTeam == "Dire" then
         victor = DOTA_TEAM_BADGUYS
-        s = "Radiant"
-      end
+        s = "Dire"
     end
   else
     -- Find someone alive and declare that team the winner (since all other team is dead)
     self:LoopOverPlayers(function(player, plyID)
       if player.bDead == false then
         victor = player.nTeam
+        print ("player's team"..player.nTeam)
+        print('test')
         if victor == DOTA_TEAM_BADGUYS then
           s = "Dire"
         end
@@ -608,7 +685,6 @@ function HideAndSeekGameMode:RoundComplete(timedOut)
   else
     self.nDireScore = self.nDireScore + 1
   end
-
   GameMode:SetTopBarTeamValue ( DOTA_TEAM_BADGUYS, self.nDireScore )
   GameMode:SetTopBarTeamValue ( DOTA_TEAM_GOODGUYS, self.nRadiantScore )
 
@@ -623,7 +699,8 @@ function HideAndSeekGameMode:RoundComplete(timedOut)
     self:CreateTimer('endGame', {
     endTime = Time() + POST_GAME_TIME,
     callback = function(hideandseek, args)
-      --HideAndSeekGameMode:CloseServer()
+    print ('game ends')
+      HideAndSeekGameMode:CloseServer()
     end})
     return
   elseif self.nDireScore == ROUNDS_TO_WIN then
@@ -633,7 +710,7 @@ function HideAndSeekGameMode:RoundComplete(timedOut)
     self:CreateTimer('endGame', {
     endTime = Time() + POST_GAME_TIME,
     callback = function(hideandseek, args)
-      --HideAndSeekGameMode:CloseServer()
+      HideAndSeekGameMode:CloseServer()
     end})
     return
   end
@@ -646,6 +723,12 @@ function HideAndSeekGameMode:RoundComplete(timedOut)
   self.nCurrentRound = self.nCurrentRound + 1
   self.nRadiantDead = 0
   self.nDireDead = 0
-
+  print ('restarting round')
   self:InitializeRound()
 end
+
+function HideAndSeekGameMode:CloseServer()
+  -- Just exit
+  SendToServerConsole('exit')
+end
+
