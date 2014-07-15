@@ -8,7 +8,6 @@ STARTING_GOLD = 500--650
 MAX_LEVEL = 50
 
 bInPreRound = true
-roundOne = true
 
 ROUNDS_TO_WIN = 3
 ROUND_TIME = 10 --240
@@ -496,8 +495,21 @@ roundOne = true
 function HideAndSeekGameMode:InitializeRound()
   print ( '[REFLEX] InitializeRound called' )
   bInPreRound = true
-  GameRules:SetUseUniversalShopMode( true )
 
+  if roundOne then
+      self:CreateTimer('reflexDetail', {
+        endTime = GameRules:GetGameTime() + 10,
+        useGameTime = true,
+        callback = function(hideandseek, args)
+          GameRules:SendCustomMessage("Welcome to <font color='#70EA72'>Hide and Seek!</font>", 0, 0)
+          GameRules:SendCustomMessage("Version: " .. HNS_VERSION, 0, 0)
+          GameRules:SendCustomMessage("Created by <font color='#70EA72'>TechTeller</font>", 0, 0)
+          GameRules:SendCustomMessage("Map by <font color='#70EA72'>Azarak</font>", 0, 0)
+          GameRules:SendCustomMessage("Send feedback to <font color='#70EA72'>techteller96@gmail.com</font>", 0, 0)
+        end
+      })
+      roundOne = false;
+  end
   --cancelTimer = false
   --Init Round (give level ups/points/gold back)
   self:RemoveTimer('playerInit')
@@ -511,7 +523,7 @@ function HideAndSeekGameMode:InitializeRound()
       if player.bRoundInit == false then
         print ( '[REFLEX] Initializing player ' .. plyID)
         player.bRoundInit = true
-        if not self.nCurrentRound ~= 1 then
+        if self.nCurrentRound ~= 1 then
           if player.hero:GetUnitName() == "npc_dota_hero_templar_assassin" then
             print('hunters contains player')
             player.hero = PlayerResource:ReplaceHeroWith(player.hero:GetPlayerID(), "npc_dota_hero_ancient_apparition", 0, 0)
@@ -526,8 +538,11 @@ function HideAndSeekGameMode:InitializeRound()
             ab4:SetLevel(3)
           elseif player.hero:GetUnitName() == "npc_dota_hero_ancient_apparition" then
             local prop = Entities:FindByClassnameNearest("prop_dynamic", player.hero:GetOrigin(), 1.0)
-            prop:Remove()
-            print ('props contains player')
+            if prop then
+              prop:Remove()
+            end
+            print ('props contains player')            
+            FireGameEvent('hns_make_blind', { player_ID = player.hero:GetPlayerID() })
             player.hero = PlayerResource:ReplaceHeroWith(player.hero:GetPlayerID(), "npc_dota_hero_templar_assassin", 0, 0)
             player.hero:SetAbilityPoints(0)
             local slingshot = CreateItem("item_slingshot", hero, hero)
@@ -553,20 +568,7 @@ function HideAndSeekGameMode:InitializeRound()
   
   self:ShowCenterMessage(string.format("Round %d starts in %d seconds!", self.nCurrentRound, roundTime), 10)
   
-  if roundOne then
-    self:CreateTimer('reflexDetail', {
-      endTime = GameRules:GetGameTime() + 10,
-      useGameTime = true,
-      callback = function(hideandseek, args)
-        GameRules:SendCustomMessage("Welcome to <font color='#70EA72'>Hide and Seek!</font>", 0, 0)
-        GameRules:SendCustomMessage("Version: " .. HNS_VERSION, 0, 0)
-        GameRules:SendCustomMessage("Created by <font color='#70EA72'>TechTeller</font>", 0, 0)
-        GameRules:SendCustomMessage("Map by <font color='#70EA72'>Azarak</font>", 0, 0)
-        GameRules:SendCustomMessage("Send feedback to <font color='#70EA72'>techteller96@gmail.com</font>", 0, 0)
-      end
-    })
-    roundOne = false
-  end
+  
 
   local startCount = 7
   --Set Timers for round start announcements
@@ -587,6 +589,8 @@ function HideAndSeekGameMode:InitializeRound()
         if player.hero:HasModifier("modifier_invulnerable") then
           player.hero:RemoveModifierByName("modifier_invulnerable")
         end
+
+        FireGameEvent('hns_unmake_blind', { player_ID = player.hero:GetPlayerID() })
 
         local timeoutCount = 14
         self:CreateTimer('round_time_out',{
@@ -626,7 +630,7 @@ function HideAndSeekGameMode:InitializeRound()
           end
         end})
       end)
-
+      
       bInPreRound = false;
       local msg = {
         message = "GO!",

@@ -20,5 +20,13 @@
 
 "CustomEvents"
 {
+	"hns_make_blind"
+	{
+		"player_ID"		"short"
+	}
+	"hns_unmake_blind"
+	{
+		"player_ID"		"short"
+	}
 }
 
