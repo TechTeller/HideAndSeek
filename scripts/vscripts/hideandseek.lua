@@ -5,12 +5,12 @@ USE_LOBBY = false
 THINK_TIME = 0.1
 
 STARTING_GOLD = 500--650
-MAX_LEVEL = 50
+MAX_LEVEL = 25
 
 bInPreRound = true
 
 ROUNDS_TO_WIN = 3
-ROUND_TIME = 10 --240
+ROUND_TIME = 130 --240
 PRE_GAME_TIME = 0 -- 30
 PRE_ROUND_TIME = 30 --30
 POST_ROUND_TIME = 5
@@ -51,6 +51,7 @@ function HideAndSeekGameMode:InitGameMode()
   -- Hooks
   ListenToGameEvent('player_connect_full', Dynamic_Wrap(HideAndSeekGameMode, 'AutoAssignPlayer'), self)
   ListenToGameEvent('player_disconnect', Dynamic_Wrap(HideAndSeekGameMode, 'CleanupPlayer'), self)
+  ListenToGameEvent('entity_killed', Dynamic_Wrap(HideAndSeekGameMode, 'OnEntityKilled'), self)
 
   -- Fill server with fake clients
   Convars:RegisterCommand('fake', function()
@@ -117,8 +118,8 @@ function HideAndSeekGameMode:InitGameMode()
   self.nRadiantScore = 0
   self.nDireScore = 0
 
-  self.PropsTeam = "Dire"
-  self.HunterTeam = "Radiant"
+  self.PropsTeam = DOTA_TEAM_BADGUYS
+  self.HunterTeam = DOTA_TEAM_GOODGUYS
 
 
   -- Timers
@@ -173,6 +174,58 @@ function HideAndSeekGameMode:CaptureGameMode()
     print( '[hideandseek] Beginning Think' ) 
     GameMode:SetContextThink("hideandseekThink", Dynamic_Wrap( HideAndSeekGameMode, 'Think' ), 0.1 )
   end 
+end
+
+function HideAndSeekGameMode:OnEntityKilled( keys )
+  local killedUnit = EntIndexToHScript(keys.entIndex_killed)
+  local killerEntity = nil
+
+  if keys.entindex_attacker ~= nil then
+
+  end
+
+  local enemyData = nil
+  if killedUnit then
+    if killerEntity then
+      local killerID = killerEntity:GetPlayerOwnerID()
+      if self.vPlayers[killerID] ~= nil then
+        self.vPlayers[killerID].nKillsThisRound = self.vPlayers[killerID].nKillsThisRound + 1
+      end
+    end
+
+    local killedID = killedUnit:GetPlayerOwnerID()
+    self.vPlayers[killedID].bDead = true
+
+    -- Victory Check
+    local nRadiantAlive = 0
+    local nDireAlive = 0
+    self:LoopOverPlayers(function(player, plyID)
+      if player.bDead == false then
+        if player.nTeam == DOTA_TEAM_GOODGUYS then
+          nRadiantAlive = nRadiantAlive + 1
+        else
+          nDireAlive = nDireAlive + 1
+        end
+      end
+    end)
+
+    if nRadiantAlive == 0 or nDireAlive == 0 then
+      self:RemoveTimer('round_time_out')
+    
+      self:LoopOverPlayers(function(player, plyID)
+        if player.bDead == false then
+          player.hero:AddNewModifier( player.hero, nil , "modifier_invulnerable", {})
+        end
+      end)  
+      self:CreateTimer('victory', {
+        endTime = Time() + POST_ROUND_TIME,
+        callback = function(hideandseek, args)
+          HideAndSeekGameMode:RoundComplete(false)
+        end})
+      return
+    end
+
+  end
 end
 
 function HideAndSeekGameMode:ShowCenterMessage(msg,dur)
@@ -235,7 +288,7 @@ function HideAndSeekGameMode:AutoAssignPlayer(keys)
       ply:__KeyValueFromInt('teamnumber', DOTA_TEAM_BADGUYS)
       table.insert (self.vDire, ply)
       addToSet (self.Props, ply)
-      local hero = CreateHeroForPlayer("npc_dota_hero_ancient_apparition", ply)
+      local hero = CreateHeroForPlayer("npc_dota_hero_wisp", ply)
       hero:SetAbilityPoints(0)
       local ab1 = hero:FindAbilityByName("disguise")
       ab1:SetLevel(4)
@@ -250,9 +303,12 @@ function HideAndSeekGameMode:AutoAssignPlayer(keys)
       ply:__KeyValueFromInt('teamnumber', DOTA_TEAM_GOODGUYS)
       table.insert (self.vRadiant, ply)
       addToSet (self.Hunters, ply)
-      local hero = CreateHeroForPlayer("npc_dota_hero_templar_assassin", ply)
-      local slingshot = CreateItem("item_slingshot", hero, hero)
-      hero:AddItem(slingshot)    
+      local hero = CreateHeroForPlayer("npc_dota_hero_rattletrap", ply)
+      hero:SetAbilityPoints(0)
+      local ab1 = hero:FindAbilityByName("flare")
+      ab1:SetLevel(4) 
+      local ab2 = hero:FindAbilityByName("radar") 
+      ab2:SetLevel(4)
     end
     if setContains(self.Props, player) then
       removeFromSet(self.Props, player)
@@ -439,6 +495,7 @@ function Disguise( keys )
   local target = keys.target
   local modelunit = Entities:FindByClassnameNearest("prop_dynamic", target:GetOrigin(), 1.0)
   caster:SetModel(modelunit:GetModelName())
+  caster:SetOriginalModel(modelunit:GetModelName())
   print(modelunit:GetModelName())
 end
 
@@ -476,8 +533,13 @@ function Taunt( keys )
   math.randomseed(tonumber(timeTxt))
   local tauntNumber = math.random(1,35)
   --caster:EmitSound("sound/Taunt_"..tostring(tauntNumber))
-    EmitSoundOn("Taunt_"..tostring(tauntNumber), caster)
+  local tauntname = "Taunt_"..tostring(tauntNumber)
+    local sound = EmitSoundOn(tauntname, caster)
+    local duration = caster:GetSoundDuration(tauntname, nil)
+    local thisability = caster:FindAbilityByName("taunt")
+    thisability:StartCooldown(duration)
   print (tostring(tauntNumber))
+  print(tostring(duration))
 end
 
   function addToSet(set, key)
@@ -508,8 +570,8 @@ function HideAndSeekGameMode:InitializeRound()
           GameRules:SendCustomMessage("Send feedback to <font color='#70EA72'>techteller96@gmail.com</font>", 0, 0)
         end
       })
-      roundOne = false;
   end
+  roundOne = false;
   --cancelTimer = false
   --Init Round (give level ups/points/gold back)
   self:RemoveTimer('playerInit')
@@ -524,9 +586,10 @@ function HideAndSeekGameMode:InitializeRound()
         print ( '[REFLEX] Initializing player ' .. plyID)
         player.bRoundInit = true
         if self.nCurrentRound ~= 1 then
-          if player.hero:GetUnitName() == "npc_dota_hero_templar_assassin" then
+          if player.hero:GetUnitName() == "npc_dota_hero_rattletrap" then
+            self.PropsTeam = player.nTeam
             print('hunters contains player')
-            player.hero = PlayerResource:ReplaceHeroWith(player.hero:GetPlayerID(), "npc_dota_hero_ancient_apparition", 0, 0)
+            player.hero = PlayerResource:ReplaceHeroWith(player.hero:GetPlayerID(), "npc_dota_hero_wisp", 0, 0)
             player.hero:SetAbilityPoints(0)
             local ab1 = player.hero:FindAbilityByName("disguise")
             ab1:SetLevel(4)
@@ -536,21 +599,26 @@ function HideAndSeekGameMode:InitializeRound()
             ab3:SetLevel(4)
             local ab4 = player.hero:FindAbilityByName("taunt")
             ab4:SetLevel(3)
-          elseif player.hero:GetUnitName() == "npc_dota_hero_ancient_apparition" then
+          elseif player.hero:GetUnitName() == "npc_dota_hero_wisp" then
+            self.HunterTeam = player.nTeam
             local prop = Entities:FindByClassnameNearest("prop_dynamic", player.hero:GetOrigin(), 1.0)
             if prop then
               prop:Remove()
             end
+            self.HunterTeam = player.nTeam
             print ('props contains player')            
             FireGameEvent('hns_make_blind', { player_ID = player.hero:GetPlayerID() })
-            player.hero = PlayerResource:ReplaceHeroWith(player.hero:GetPlayerID(), "npc_dota_hero_templar_assassin", 0, 0)
-            player.hero:SetAbilityPoints(0)
-            local slingshot = CreateItem("item_slingshot", hero, hero)
-            hero:AddItem(slingshot)
+            print ('made blind')
+            player.hero = PlayerResource:ReplaceHeroWith(player.hero:GetPlayerID(), "npc_dota_hero_rattletrap", 0, 0)
+            hero:SetAbilityPoints(0)
+            local ab1 = hero:FindAbilityByName("flare")
+            ab1:SetLevel(4) 
+            local ab2 = hero:FindAbilityByName("radar") 
+            ab2:SetLevel(4)
           end
         end
 
-        if not player.hero:HasModifier("modifier_stunned") then
+        if not player.hero:HasModifier("modifier_stunned") and player.hero:GetUnitName() ~= "npc_dota_hero_wisp" then
           player.hero:AddNewModifier( player.hero, nil , "modifier_stunned", {})
         end
 
@@ -615,17 +683,12 @@ function HideAndSeekGameMode:InitializeRound()
             self:ShowCenterMessage("2 minutes remaining!", 5)
             return GameRules:GetGameTime() + 60
           elseif timeoutCount == 12 then
-            Say(nil, "1 minute remaining!", false)
+            self.ShowCenterMessage("1 minute remaining!", 5)
             return GameRules:GetGameTime() + 30
           elseif timeoutCount == 11 then
             self:ShowCenterMessage("30 seconds remaining!", 5)
             return GameRules:GetGameTime() + 20
           else
-            local msg = {
-              message = tostring(timeoutCount),
-              duration = 0.9
-            }
-            FireGameEvent("show_center_message",msg)
             return GameRules:GetGameTime() + 1
           end
         end})
@@ -667,14 +730,16 @@ function HideAndSeekGameMode:RoundComplete(timedOut)
   if timedOut then
     --If hunters dont kill all props, boost props score
     if self.nLastKilled == nil then 
-        victor = DOTA_TEAM_BADGUYS
+      victor = self.PropsTeam
+      if self.PropsTeam == DOTA_TEAM_BADGUYS then
         s = "Dire"
+      end
     end
   else
     -- Find someone alive and declare that team the winner (since all other team is dead)
     self:LoopOverPlayers(function(player, plyID)
-      if player.bDead == false then
-        victor = player.nTeam
+      if player.bDead == false  and player.nTeam == self.PropsTeam then
+        victor = player.nTeamf
         print ("player's team"..player.nTeam)
         print('test')
         if victor == DOTA_TEAM_BADGUYS then
@@ -736,3 +801,86 @@ function HideAndSeekGameMode:CloseServer()
   SendToServerConsole('exit')
 end
 
+function Radar( keys )
+  local caster = keys.caster
+  local target = keys.target_points[1]
+  local radarunit  = CreateUnitByName("npc_radar_unit", target, false, nil, nil, caster:GetTeam())
+  local ab = caster:FindAbilityByName("Radar")
+  ab:SetLevel(0)
+
+  HideAndSeekGameMode:CreateTimer('ward'..caster:entindex(), {
+    endTime = GameRules:GetGameTime() + 10,
+    useGameTime = true,
+    callback = function(hideandseek, args)
+      radarunit:Remove()
+    end
+    })
+end
+
+function Flare( keys )
+  print ('flare')
+  local caster = keys.caster
+  local target = keys.target_points[1]
+  local ab1 = caster:FindAbilityByName('flare_proxy')
+  ab1:SetLevel(4)
+  caster:CastAbilityOnPosition(target, ab1, 0)
+  local count = 0
+  for k,v in pairs(Entities:FindAllInSphere(target, 200)) do
+    if v:GetClassname() == "npc_dota_building" then
+      count = count + 1
+    end
+  end
+  print(tostring(count))
+  local damage = count*10
+  dealDamage(nil, caster, damage)
+end
+
+function dealDamage(source, target, damage)
+  local unit = nil
+  if damage == 0 then
+    return
+  end
+  
+  if source ~= nil then
+    unit = CreateUnitByName("npc_dummy_unit", target:GetAbsOrigin(), false, source, source, source:GetTeamNumber())
+  else
+    unit = CreateUnitByName("npc_dummy_unit", target:GetAbsOrigin(), false, nil, nil, DOTA_TEAM_NOTEAM)
+  end
+  unit:AddNewModifier(unit, nil, "modifier_invulnerable", {})
+  unit:AddNewModifier(unit, nil, "modifier_phased", {})
+  local dummy = unit:FindAbilityByName("reflex_dummy_unit")
+  dummy:SetLevel(1)
+  
+  local abilIndex = math.floor((damage-1) / 20) + 1
+  local abilLevel = math.floor(((damage-1) % 20)) + 1
+  if abilIndex > 100 then
+    abilIndex = 100
+    abilLevel = 20
+  end
+  
+  local abilityName = "modifier_damage_applier" .. abilIndex
+  unit:AddAbility(abilityName)
+  ability = unit:FindAbilityByName( abilityName )
+  ability:SetLevel(abilLevel)
+  
+  local diff = nil
+  
+  local hp = target:GetHealth()
+  
+  diff = target:GetAbsOrigin() - unit:GetAbsOrigin()
+  diff.z = 0
+  unit:SetForwardVector(diff:Normalized())
+  unit:CastAbilityOnTarget(target, ability, 0 )
+  
+  BareBonesGameMode:CreateTimer(DoUniqueString("damage"), {
+    endTime = GameRules:GetGameTime() + 0.3,
+    useGameTime = true,
+    callback = function(barebones, args)
+      unit:Destroy()
+      if target:GetHealth() == hp and hp ~= 0 and damage ~= 0 then
+        print ("[BAREBONES] WARNING: dealDamage did no damage: " .. hp)
+        dealDamage(source, target, damage)
+      end
+    end
+  })
+end

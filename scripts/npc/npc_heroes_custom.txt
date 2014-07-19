@@ -4,7 +4,7 @@
 	{
 		"AbilityLayout" 		"4"
 		"SoundSet"				""
-		"override_hero"			"npc_dota_hero_ancient_apparition"
+		"override_hero"			"npc_dota_hero_wisp"
 		"SoundSet"				"0"	
 		"Ability1"				"disguise" 
 		"Ability2"				"solidify" 
@@ -60,11 +60,11 @@
 	"npc_dota_hero_seeker"
 	{
 		"SoundSet"				""
-		"AbilityLayout" 		"1"
-		"override_hero"			"npc_dota_hero_templar_assassin"
+		"AbilityLayout" 		"3"
+		"override_hero"			"npc_dota_hero_rattletrap"
 		"SoundSet"				"0"	
-		"Ability1"				"Radar" 
-		"Ability2"				"" 
+		"Ability1"				"flare" 
+		"Ability2"				"radar" 
 		"Ability3"				"" 
 		"Ability4"				""
 		"Ability5"				""
@@ -78,7 +78,7 @@
     	"Ability13"				""
     	"Ability14"				""
     	"Ability15"				""
-    	"Ability16"				""
+    	"Ability16"				"flare_proxy"
 
 		"ArmorPhysical"				"0"									// Physical protection.
 		"MagicalResistance"				"0"									// Magical protection (percentage).
