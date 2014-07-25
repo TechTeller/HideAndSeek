@@ -177,12 +177,9 @@ function HideAndSeekGameMode:CaptureGameMode()
 end
 
 function HideAndSeekGameMode:OnEntityKilled( keys )
-  local killedUnit = EntIndexToHScript(keys.entIndex_killed)
-  local killerEntity = nil
-
-  if keys.entindex_attacker ~= nil then
-
-  end
+  local killedUnit = EntIndexToHScript(keys.entindex_killed)
+  local attacker = EntIndexToHScript(keys.entindex_attacker)
+  local killerEntity = nil 
 
   local enemyData = nil
   if killedUnit then
@@ -510,6 +507,7 @@ function SolidifyOn( keys )
   caster:AddNewModifier(caster, nil, "modifier_persistent_invisibility", {duration = -1})
   local disguiseability = caster:FindAbilityByName("disguise")
   disguiseability:SetLevel(0)
+  local u = CreateUnitByName("npc_tree_dummy", caster:GetOrigin(), false, nil, nil, DOTA_TEAM_NEUTRALS)
 end
 
 function SolidifyOff( keys )
@@ -520,8 +518,10 @@ function SolidifyOff( keys )
   caster:SetModel(prop:GetModelName())
   caster:SetOriginalModel(prop:GetModelName())
   local disguiseability = caster:FindAbilityByName("disguise")
-  disguiseability:SetLevel(1)
+  disguiseability:SetLevel(4)
   prop:Remove()
+  local modelunit = Entities:FindByClassnameNearest("npc_dota_building", caster:GetOrigin(), 1.0)
+  modelunit:Remove()
 end
 
 function Taunt( keys )
@@ -610,7 +610,7 @@ function HideAndSeekGameMode:InitializeRound()
             FireGameEvent('hns_make_blind', { player_ID = player.hero:GetPlayerID() })
             print ('made blind')
             player.hero = PlayerResource:ReplaceHeroWith(player.hero:GetPlayerID(), "npc_dota_hero_rattletrap", 0, 0)
-            hero:SetAbilityPoints(0)
+            player.hero:SetAbilityPoints(0)
             local ab1 = hero:FindAbilityByName("flare")
             ab1:SetLevel(4) 
             local ab2 = hero:FindAbilityByName("radar") 
@@ -710,6 +710,7 @@ function HideAndSeekGameMode:InitializeRound()
         duration = 0.9
       }
       FireGameEvent("show_center_message",msg)
+      print ('event fired')
       return GameRules:GetGameTime() + 1
     end
   end})
@@ -821,7 +822,7 @@ function Flare( keys )
   print ('flare')
   local caster = keys.caster
   local target = keys.target_points[1]
-  local ab1 = caster:FindAbilityByName('flare_proxy')
+  local ab1 = caster:FindAbilityByName("flare_proxy")
   ab1:SetLevel(4)
   caster:CastAbilityOnPosition(target, ab1, 0)
   local count = 0
@@ -832,55 +833,40 @@ function Flare( keys )
   end
   print(tostring(count))
   local damage = count*10
-  dealDamage(nil, caster, damage)
+
+  local distance = distanceFrom(caster:GetOrigin().x, target.x, caster:GetOrigin().y, target.y)
+  local speed = 1500
+  local time = distance/speed
+  
+  local ability = caster:FindAbilityByName('flare')
+  ability:StartCooldown(time)
+  HideAndSeekGameMode:CreateTimer("flare"..caster:entindex(), {
+    endTime = GameRules:GetGameTime() + time,
+    useGameTime = true,
+    callback = function(hideandseek, args)
+      dealDamage(caster, caster, damage)
+      HideAndSeekGameMode:RemoveTimer('flare'..caster:entindex())
+      print ('removed timer')
+    end})
 end
 
+-- A helper function for dealing damage from a source unit to a target unit.  Damage dealt is pure damage
 function dealDamage(source, target, damage)
-  local unit = nil
-  if damage == 0 then
+  if damage <= 0 or source == nil or target == nil then
     return
   end
-  
-  if source ~= nil then
-    unit = CreateUnitByName("npc_dummy_unit", target:GetAbsOrigin(), false, source, source, source:GetTeamNumber())
-  else
-    unit = CreateUnitByName("npc_dummy_unit", target:GetAbsOrigin(), false, nil, nil, DOTA_TEAM_NOTEAM)
-  end
-  unit:AddNewModifier(unit, nil, "modifier_invulnerable", {})
-  unit:AddNewModifier(unit, nil, "modifier_phased", {})
-  local dummy = unit:FindAbilityByName("reflex_dummy_unit")
-  dummy:SetLevel(1)
-  
-  local abilIndex = math.floor((damage-1) / 20) + 1
-  local abilLevel = math.floor(((damage-1) % 20)) + 1
-  if abilIndex > 100 then
-    abilIndex = 100
-    abilLevel = 20
-  end
-  
-  local abilityName = "modifier_damage_applier" .. abilIndex
-  unit:AddAbility(abilityName)
-  ability = unit:FindAbilityByName( abilityName )
-  ability:SetLevel(abilLevel)
-  
-  local diff = nil
-  
-  local hp = target:GetHealth()
-  
-  diff = target:GetAbsOrigin() - unit:GetAbsOrigin()
-  diff.z = 0
-  unit:SetForwardVector(diff:Normalized())
-  unit:CastAbilityOnTarget(target, ability, 0 )
-  
-  BareBonesGameMode:CreateTimer(DoUniqueString("damage"), {
-    endTime = GameRules:GetGameTime() + 0.3,
-    useGameTime = true,
-    callback = function(barebones, args)
-      unit:Destroy()
-      if target:GetHealth() == hp and hp ~= 0 and damage ~= 0 then
-        print ("[BAREBONES] WARNING: dealDamage did no damage: " .. hp)
-        dealDamage(source, target, damage)
-      end
+  local dmgTable = {8192,4096,2048,1024,512,256,128,64,32,16,8,4,2,1}
+  local item = CreateItem( "item_deal_damage", source, source)
+  for i=1,#dmgTable do
+    local val = dmgTable[i]
+    local count = math.floor(damage / val)
+    if count >= 1 then
+      item:ApplyDataDrivenModifier( source, target, "dealDamage" .. val, {duration=0} )
+      damage = damage - val
     end
-  })
+  end
+  UTIL_RemoveImmediate(item)
+  item = nilz
 end
+
+function distanceFrom(x1,y1,x2,y2) return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2) end
